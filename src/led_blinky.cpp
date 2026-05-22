@@ -1,105 +1,34 @@
 #include "led_blinky.h"
-
-const char* morseDictionary[] = {
-  ".-",     // A
-  "-...",   // B
-  "-.-.",   // C
-  "-..",    // D
-  ".",      // E
-  "..-.",   // F
-  "--.",    // G
-  "....",   // H
-  "..",     // I
-  ".---",   // J
-  "-.-",    // K
-  ".-..",   // L
-  "--",     // M
-  "-.",     // N
-  "---",    // O
-  ".--.",   // P
-  "--.-",   // Q
-  ".-.",    // R
-  "...",    // S
-  "-",      // T
-  "..-",    // U
-  "...-",   // V
-  ".--",    // W
-  "-..-",   // X
-  "-.--",   // Y
-  "--..",   // Z
-  "-----",  // 0
-  ".----",  // 1
-  "..---",  // 2
-  "...--",  // 3
-  "....-",  // 4
-  ".....",  // 5
-  "-....",  // 6
-  "--...",  // 7
-  "---..",  // 8
-  "----."   // 9
-};
-
-#define DOT_DURATION 100      
-#define DASH_DURATION 300     
-#define GAP_IN_CHAR 100       
-#define GAP_BETWEEN_CHAR 300  
-#define GAP_BETWEEN_WORD 700  
-
-const char* getMorseCode(char c) {
-  if (c >= 'A' && c <= 'Z') {
-    return morseDictionary[c - 'A'];
-  } else if (c >= 'a' && c <= 'z') {
-    return morseDictionary[c - 'a'];
-  } else if (c >= '0' && c <= '9') {
-    return morseDictionary[26 + (c - '0')];
-  }
-  return NULL;
-}
-
-
-void blinkMorseChar(const char* morse) {
-  for (int i = 0; morse[i] != '\0'; i++) {
-    if (morse[i] == '.') {
-      digitalWrite(LED_GPIO, HIGH);
-      vTaskDelay(pdMS_TO_TICKS(DOT_DURATION));
-      digitalWrite(LED_GPIO, LOW);
-    } else if (morse[i] == '-') {
-      digitalWrite(LED_GPIO, HIGH);
-      vTaskDelay(pdMS_TO_TICKS(DASH_DURATION));
-      digitalWrite(LED_GPIO, LOW);
-    }
-    
-    // Gap within character (between dots/dashes)
-    if (morse[i + 1] != '\0') {
-      vTaskDelay(pdMS_TO_TICKS(GAP_IN_CHAR));
-    }
-  }
-}
+#include "global.h"
+#include "config.h"
 
 void led_blinky(void *pvParameters) {
   pinMode(LED_GPIO, OUTPUT);
   digitalWrite(LED_GPIO, LOW);
-  
-  const char* message = (const char*)pvParameters;
-  
+
   while (1) {
-    if (message == NULL) {
-      message = "HELLO";
-    }
-    
-    for (int i = 0; message[i] != '\0'; i++) {
-      if (message[i] == ' ') {
-        vTaskDelay(pdMS_TO_TICKS(GAP_BETWEEN_WORD));
-      } else {
-        const char* morse = getMorseCode(message[i]);
-        if (morse != NULL) {
-          blinkMorseChar(morse);
-          // Gap between characters
-          vTaskDelay(pdMS_TO_TICKS(GAP_BETWEEN_CHAR));
-        }
+    xSemaphoreTake(xSemLED, portMAX_DELAY);
+
+    SensorData_t data;
+    if (xQueuePeek(xSensorQueue, &data, 0) != pdTRUE) continue;
+
+    float temp = data.temperature;
+
+    if (temp >= TEMP_COLD_MAX && temp <= TEMP_HOT_MIN) {
+      // Normal range — steady on for one sensor cycle
+      digitalWrite(LED_GPIO, HIGH);
+      vTaskDelay(pdMS_TO_TICKS(SENSOR_INTERVAL_MS));
+    } else {
+      // Slow blink < 20°C, fast blink > 35°C
+      uint32_t period = (temp < TEMP_COLD_MAX) ? LED_SLOW_PERIOD_MS : LED_FAST_PERIOD_MS;
+      uint32_t elapsed = 0;
+      while (elapsed < SENSOR_INTERVAL_MS) {
+        digitalWrite(LED_GPIO, HIGH);
+        vTaskDelay(pdMS_TO_TICKS(period / 2));
+        digitalWrite(LED_GPIO, LOW);
+        vTaskDelay(pdMS_TO_TICKS(period / 2));
+        elapsed += period;
       }
     }
-    
-    vTaskDelay(pdMS_TO_TICKS(2000));
   }
 }

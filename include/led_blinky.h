@@ -7,12 +7,7 @@
 
 #define LED_GPIO 48
 
-// Morse code blinking function
-// pvParameters: pointer to const char* message (e.g., "HELLO")
+// Blinks at rate based on current temperature: slow < 20°C, steady 20–35°C, fast > 35°C
 void led_blinky(void *pvParameters);
-
-// Helper functions
-const char* getMorseCode(char c);
-void blinkMorseChar(const char* morse);
 
 #endif

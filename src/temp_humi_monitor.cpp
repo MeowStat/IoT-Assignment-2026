@@ -1,10 +1,11 @@
 #include "temp_humi_monitor.h"
+#include "config.h"
 
 DHT20 dht;
 LiquidCrystal_I2C lcd(33, 16, 2);
 
 void temp_humi_monitor(void *pvParameters) {
-  Serial.println("[Temp/Humidity Monitor] Starting...");
+  Serial.println("[SensorTask] Starting...");
 
   Wire.begin(11, 12);
   dht.begin();
@@ -13,44 +14,44 @@ void temp_humi_monitor(void *pvParameters) {
   lcd.backlight();
   lcd.clear();
 
-  Serial.println("[Temp/Humidity Monitor] LCD initialized");
-  Serial.println("[Temp/Humidity Monitor] DHT20 sensor ready");
+  Serial.println("[SensorTask] LCD + DHT20 ready");
 
   while (1) {
     int status = dht.read();
     float temperature = dht.getTemperature();
-    float humidity = dht.getHumidity();
+    float humidity    = dht.getHumidity();
 
     if (status != DHT20_OK) {
-      Serial.println("[Temp/Humidity Monitor] Failed to read from DHT20!");
-
+      Serial.println("[SensorTask] DHT20 read failed");
       lcd.setCursor(0, 0);
       lcd.print("Error: DHT20    ");
       lcd.setCursor(0, 1);
       lcd.print("Read failed     ");
-      
-      temperature = humidity = -1;
     } else {
       SensorData_t data = { temperature, humidity };
       xQueueOverwrite(xSensorQueue, &data);
 
-      Serial.print("[Temp/Humidity Monitor] Temp: ");
-      Serial.print(temperature);
-      Serial.print("°C  Humidity: ");
-      Serial.print(humidity);
-      Serial.println("%");
-      
+      xSemaphoreGive(xSemLED);
+      xSemaphoreGive(xSemNeo);
+
+      Serial.printf("[SensorTask] T: %.1f C  H: %.1f%%\n", temperature, humidity);
+
+      const char* state;
+      if (temperature > TEMP_CRITICAL_MIN || humidity >= HUMID_CRITICAL_MIN) {
+        state = "CRITICAL";
+      } else if ((temperature > TEMP_HOT_MIN && temperature <= TEMP_WARNING_MAX) ||
+                 (humidity > HUMID_IDEAL_MAX && humidity <= HUMID_WARNING_MAX)) {
+        state = "WARNING";
+      } else {
+        state = "NORMAL";
+      }
+
       lcd.setCursor(0, 0);
-      lcd.print("Temp:");
-      lcd.print(temperature, 2);  
-      lcd.print("C ");
-      
+      lcd.printf("T:%.1fC  H:%.1f%%", temperature, humidity);
       lcd.setCursor(0, 1);
-      lcd.print("Humi:");
-      lcd.print(humidity, 2);
-      lcd.print("%");
+      lcd.printf("State:%-8s", state);
     }
 
-    vTaskDelay(pdMS_TO_TICKS(5000));
+    vTaskDelay(pdMS_TO_TICKS(SENSOR_INTERVAL_MS));
   }
 }
