@@ -54,8 +54,10 @@ void tiny_ml_task(void *pvParameters)
 
         // Prepare input data (e.g., sensor readings)
         // For a simple example, let's assume a single float input
-        input->data.f[0] = glob_temperature;
-        input->data.f[1] = glob_humidity;
+        SensorData_t sensorData;
+        xQueuePeek(xSensorQueue, &sensorData, 0);
+        input->data.f[0] = sensorData.temperature / 45.0f;
+        input->data.f[1] = sensorData.humidity / 100.0f;
 
         // Run inference
         TfLiteStatus invoke_status = interpreter->Invoke();

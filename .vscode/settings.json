@@ -15,5 +15,6 @@
         "initializer_list": "cpp",
         "span": "cpp",
         "regex": "cpp"
-    }
+    },
+    "cmake.sourceDirectory": "D:/TinnieWorkspace/YoloUNO_PlatformIO/lib/ArduinoJson/src"
 }

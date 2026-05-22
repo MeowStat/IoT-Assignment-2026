@@ -27,6 +27,9 @@ void handleWebSocketMessage(String message)
         pinMode(gpio, OUTPUT);
         if (status.equalsIgnoreCase("ON"))
         {
+            if (value["name"] == 'Door') {
+                
+            }
             digitalWrite(gpio, HIGH);
             Serial.printf("🔆 GPIO %d ON\n", gpio);
         }
@@ -51,10 +54,10 @@ void handleWebSocketMessage(String message)
         Serial.println("SERVER: " + CORE_IOT_SERVER);
         Serial.println("PORT: " + CORE_IOT_PORT);
 
-        // 👉 Gọi hàm lưu cấu hình
+        xSemaphoreTake(xSemaphoreConfiguring, portMAX_DELAY);
         Save_info_File(WIFI_SSID, WIFI_PASS, CORE_IOT_TOKEN, CORE_IOT_SERVER, CORE_IOT_PORT);
+        xSemaphoreGive(xSemaphoreConfiguring);
 
-        // Phản hồi lại client (tùy chọn)
         String msg = "{\"status\":\"ok\",\"page\":\"setting_saved\"}";
         ws.textAll(msg);
     }

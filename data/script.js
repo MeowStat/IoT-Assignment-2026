@@ -28,21 +28,53 @@ function initWebSocket() {
 function Send_Data(data) {
     if (websocket && websocket.readyState === WebSocket.OPEN) {
         websocket.send(data);
-        console.log("📤 Gửi:", data);
+        console.log("Sent:", data);
     } else {
-        console.warn("⚠️ WebSocket chưa sẵn sàng!");
-        alert("⚠️ WebSocket chưa kết nối!");
+        console.warn("WebSocket is not ready!");
+        alert("WebSocket is not connected!");
     }
 }
 
 function onMessage(event) {
-    console.log("📩 Nhận:", event.data);
+    console.log("Received:", event.data);
     try {
         var data = JSON.parse(event.data);
-        // Có thể thêm xử lý riêng nếu cần (ví dụ cập nhật trạng thái)
+        if (data.page === "sensor") {
+            updateSensorUI(parseFloat(data.temp), parseFloat(data.humi));
+        }
     } catch (e) {
-        console.warn("Không phải JSON hợp lệ:", event.data);
+        console.warn("Not JSON:", event.data);
     }
+}
+
+
+// ==================== SENSOR DISPLAY ====================
+function updateSensorState(valueId, badgeId, value, low, high) {
+    var valEl = document.getElementById(valueId);
+    var badgeEl = document.getElementById(badgeId);
+    
+    // Update numerical value text
+    valEl.textContent = value.toFixed(1);
+
+    // Apply colors and update badge based on thresholds
+    if (value < low) {
+        badgeEl.textContent = 'Low';
+        badgeEl.className = 'status-badge badge-low';
+        valEl.style.color = '#3b82f6'; // Blue for Low
+    } else if (value > high) {
+        badgeEl.textContent = 'High';
+        badgeEl.className = 'status-badge badge-high';
+        valEl.style.color = '#ef4444'; // Red for High
+    } else {
+        badgeEl.textContent = 'OK';
+        badgeEl.className = 'status-badge badge-ok';
+        valEl.style.color = '#22c55e'; // Green for OK
+    }
+}
+
+function updateSensorUI(temp, humi) {
+    updateSensorState('val_temp', 'badge_temp', temp, 15, 28);
+    updateSensorState('val_humi', 'badge_humi', humi, 60, 80);
 }
 
 
@@ -58,41 +90,6 @@ function showSection(id, event) {
 }
 
 
-// ==================== HOME GAUGES ====================
-window.onload = function () {
-    const gaugeTemp = new JustGage({
-        id: "gauge_temp",
-        value: 26,
-        min: -10,
-        max: 50,
-        donut: true,
-        pointer: false,
-        gaugeWidthScale: 0.25,
-        gaugeColor: "transparent",
-        levelColorsGradient: true,
-        levelColors: ["#00BCD4", "#4CAF50", "#FFC107", "#F44336"]
-    });
-
-    const gaugeHumi = new JustGage({
-        id: "gauge_humi",
-        value: 60,
-        min: 0,
-        max: 100,
-        donut: true,
-        pointer: false,
-        gaugeWidthScale: 0.25,
-        gaugeColor: "transparent",
-        levelColorsGradient: true,
-        levelColors: ["#42A5F5", "#00BCD4", "#0288D1"]
-    });
-
-    setInterval(() => {
-        gaugeTemp.refresh(Math.floor(Math.random() * 15) + 20);
-        gaugeHumi.refresh(Math.floor(Math.random() * 40) + 40);
-    }, 3000);
-};
-
-
 // ==================== DEVICE FUNCTIONS ====================
 function openAddRelayDialog() {
     document.getElementById('addRelayDialog').style.display = 'flex';
@@ -103,7 +100,7 @@ function closeAddRelayDialog() {
 function saveRelay() {
     const name = document.getElementById('relayName').value.trim();
     const gpio = document.getElementById('relayGPIO').value.trim();
-    if (!name || !gpio) return alert("⚠️ Please fill all fields!");
+    if (!name || !gpio) return alert("Please fill in all fields!");
     relayList.push({ id: Date.now(), name, gpio, state: false });
     renderRelays();
     closeAddRelayDialog();
@@ -115,13 +112,17 @@ function renderRelays() {
         const card = document.createElement('div');
         card.className = 'device-card';
         card.innerHTML = `
-      <i class="fa-solid fa-bolt device-icon"></i>
+      <div class="device-icon">
+        <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      </div>
       <h3>${r.name}</h3>
       <p>GPIO: ${r.gpio}</p>
       <button class="toggle-btn ${r.state ? 'on' : ''}" onclick="toggleRelay(${r.id})">
         ${r.state ? 'ON' : 'OFF'}
       </button>
-      <i class="fa-solid fa-trash delete-icon" onclick="showDeleteDialog(${r.id})"></i>
+      <button class="delete-icon" onclick="showDeleteDialog(${r.id})">
+        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>
+      </button>
     `;
         container.appendChild(card);
     });
@@ -156,7 +157,7 @@ function confirmDelete() {
 }
 
 
-// ==================== SETTINGS FORM (BỔ SUNG) ====================
+// ==================== SETTINGS FORM ====================
 document.getElementById("settingsForm").addEventListener("submit", function (e) {
     e.preventDefault();
 
@@ -178,5 +179,5 @@ document.getElementById("settingsForm").addEventListener("submit", function (e) 
     });
 
     Send_Data(settingsJSON);
-    alert("✅ Cấu hình đã được gửi đến thiết bị!");
+    alert("✅ Configuration has been sent to the device!");
 });
