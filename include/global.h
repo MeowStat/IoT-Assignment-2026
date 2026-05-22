@@ -6,6 +6,10 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include "freertos/queue.h"
+#include "ml_result.h"
+
+#define LED1_PIN 48     // pump (irrigation valve)  - controlled by AUTO + telemetry
+#define LED2_PIN 41     // fan / shade motor       - controlled by AUTO + telemetry
 
 typedef struct {
     float temperature;
@@ -32,4 +36,17 @@ extern boolean isWifiConnected;
 extern SemaphoreHandle_t xBinarySemaphoreInternet;
 extern SemaphoreHandle_t xMutexWifi;
 extern SemaphoreHandle_t xSemaphoreConfiguring;
+
+// Sync primitives for LED and NeoPixel tasks
+extern SemaphoreHandle_t xSemLED;
+extern SemaphoreHandle_t xSemNeo;
+
+// ML result queue 
+extern QueueHandle_t xMLQueue;
+
+// Mutex for shared actuator state (led1_state, led2_state, autoMode)
+extern SemaphoreHandle_t xMutexActuatorState;
+
+// AUTO mode flag (always read/written under xMutexActuatorState)
+extern bool autoMode;
 #endif

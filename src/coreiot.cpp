@@ -1,17 +1,10 @@
 #include "coreiot.h"
-#include "mainserver.h"
-
-// ----------- CONFIGURE THESE! -----------
-const char* coreIOT_Server = "192.168.1.31";
-const char* coreIOT_Token = "AnGdNEIQNZjoIejnBilZ";   // Device Access Token
-const int   mqttPort = 1883;
-// ----------------------------------------
 
 WiFiClient espClient;
 PubSubClient client(espClient);
 
 
-void reconnect() {
+void coreiot_local_reconnect() {
   // Loop until we're reconnected
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
@@ -19,7 +12,7 @@ void reconnect() {
     //if (client.connect("ESP32Client", coreIOT_Token, NULL)) {
     String mac = WiFi.macAddress();
     mac.replace(":", "");
-    String clientId = "ESP32-" + mac;  // e.g. "ESP32-A4CF125B3C2D"
+    String clientId = "ESP32-" + mac;
 
 
     if (client.connect(clientId.c_str())) {
@@ -38,7 +31,7 @@ void reconnect() {
 }
 
 
-void callback(char* topic, byte* payload, unsigned int length) {
+void coreiot_local_callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message arrived [");
   Serial.print(topic);
   Serial.println("] ");
@@ -88,7 +81,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
 }
 
 
-void setup_coreiot(){
+void setup_coreiot_local(){
   while(1){
     if (xSemaphoreTake(xBinarySemaphoreInternet, portMAX_DELAY)) {
       break;
@@ -101,13 +94,13 @@ void setup_coreiot(){
   Serial.println(" Connected!");
 
   client.setServer(CORE_IOT_SERVER.c_str(), CORE_IOT_PORT.toInt());
-  client.setCallback(callback);
+  client.setCallback(coreiot_local_callback);
 
 }
 
-void coreiot_task(void *pvParameters) {
+void coreiot_local_task(void *pvParameters) {
 
-    setup_coreiot();
+    setup_coreiot_local();
 
     const TickType_t telemetryInterval = pdMS_TO_TICKS(5000);
     TickType_t lastTelemetry = xTaskGetTickCount() - telemetryInterval;
@@ -115,7 +108,7 @@ void coreiot_task(void *pvParameters) {
     while(1){
 
         if (!client.connected()) {
-            reconnect();
+            coreiot_local_reconnect();
         }
         client.loop();
 

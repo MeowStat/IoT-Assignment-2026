@@ -6,3 +6,5 @@
 .claude
 .agents
 plans
+include/secrets.h
+requirements.md

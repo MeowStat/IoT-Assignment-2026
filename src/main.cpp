@@ -28,7 +28,7 @@ void setup()
   xTaskCreate(wifi_task, "Task WiFi", 4096, NULL, 3, NULL);
   xTaskCreate(webserver_task, "Task Webserver", 8192, NULL, 2, NULL);
   xTaskCreate( tiny_ml_task, "Tiny ML Task" ,2048  ,NULL  ,2 , NULL);
-  xTaskCreate(coreiot_task, "CoreIOT Task" ,4096  ,NULL  ,2 , NULL);
+  xTaskCreate(coreiot_local_task, "CoreIOT Task" ,4096  ,NULL  ,2 , NULL);
   xTaskCreate(Task_Toogle_BOOT, "Task_Toogle_BOOT", 4096, NULL, 2, NULL);
 }
 

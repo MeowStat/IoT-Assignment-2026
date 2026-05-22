@@ -8,6 +8,6 @@
 #include <ArduinoJson.h>
 
 
-void coreiot_task(void *pvParameters);
+void coreiot_local_task(void *pvParameters);
 
 #endif
