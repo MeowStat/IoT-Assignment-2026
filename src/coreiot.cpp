@@ -1,4 +1,7 @@
 #include "coreiot.h"
+#include "ml_result.h"
+#include "config.h"
+#include "vineyard_state.h"
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -63,8 +66,11 @@ void coreiot_local_callback(char* topic, byte* payload, unsigned int length) {
     const char* params = doc["params"];
 
     bool newState = (strcmp(params, "ON") == 0);
-    led1_state = newState;
-    digitalWrite(LED1_PIN, led1_state ? HIGH : LOW);
+    if (xSemaphoreTake(xMutexActuatorState, pdMS_TO_TICKS(100)) == pdTRUE) {
+        led1_state = newState;
+        xSemaphoreGive(xMutexActuatorState);
+    }
+    digitalWrite(LED1_PIN, newState ? HIGH : LOW);
 
     Serial.print("Device LED ");
     Serial.println(newState ? "turned ON." : "turned OFF.");
@@ -99,34 +105,46 @@ void setup_coreiot_local(){
 }
 
 void coreiot_local_task(void *pvParameters) {
-
     setup_coreiot_local();
 
-    const TickType_t telemetryInterval = pdMS_TO_TICKS(5000);
-    TickType_t lastTelemetry = xTaskGetTickCount() - telemetryInterval;
+    const TickType_t interval = pdMS_TO_TICKS(COREIOT_INTERVAL_MS);
+    TickType_t last = xTaskGetTickCount() - interval;
 
-    while(1){
-
-        if (!client.connected()) {
-            coreiot_local_reconnect();
-        }
+    while (1) {
+        if (!client.connected()) coreiot_local_reconnect();
         client.loop();
 
-        if ((xTaskGetTickCount() - lastTelemetry) >= telemetryInterval) {
-            lastTelemetry = xTaskGetTickCount();
+        if ((xTaskGetTickCount() - last) >= interval) {
+            last = xTaskGetTickCount();
 
-            SensorData_t sensorData;
-            xQueuePeek(xSensorQueue, &sensorData, 0);
-            float t = sensorData.temperature;
-            float h = sensorData.humidity;
-            String payload = "{\"temperature\":" + String(t) + ",\"humidity\":" + String(h) + "}";
-            String mac = WiFi.macAddress();
-            mac.replace(":", "");
-            String telemetryTopic = "devices/" + mac + "/telemetry";
-            client.publish(telemetryTopic.c_str(), payload.c_str());
-            Serial.println("Published payload: " + payload);
+            SensorData_t s = {0.0f, 0.0f};
+            MLResult_t   m = {"Unknown", 0.0f};
+            xQueuePeek(xSensorQueue, &s, 0);
+            xQueuePeek(xMLQueue,     &m, 0);
+
+            bool pump = false, fan = false;
+            if (xSemaphoreTake(xMutexActuatorState, pdMS_TO_TICKS(100)) == pdTRUE) {
+                pump = led1_state; fan = led2_state;
+                xSemaphoreGive(xMutexActuatorState);
+            }
+            const char* state = getVineyardState(s.temperature, s.humidity);
+
+            char payload[256];
+            snprintf(payload, sizeof(payload),
+                "{\"temperature\":%.2f,\"humidity\":%.2f,"
+                "\"vineyard_state\":\"%s\","
+                "\"pump_status\":\"%s\",\"fan_status\":\"%s\","
+                "\"anomaly_label\":\"%s\",\"anomaly_score\":%.3f}",
+                s.temperature, s.humidity, state,
+                pump ? "ON" : "OFF", fan ? "ON" : "OFF",
+                m.label, m.confidence);
+
+            String mac = WiFi.macAddress(); mac.replace(":", "");
+            String topic = "devices/" + mac + "/telemetry";
+            client.publish(topic.c_str(), payload);
+            Serial.printf("[CoreIOT-Local] %s\n", payload);
         }
 
-        vTaskDelay(pdMS_TO_TICKS(5000));
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }

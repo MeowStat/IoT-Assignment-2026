@@ -1,5 +1,9 @@
 
 #include "task_core_iot.h"
+#include "global.h"
+#include "ml_result.h"
+#include "config.h"
+#include "vineyard_state.h"
 
 constexpr uint32_t MAX_MESSAGE_SIZE = 1024U;
 
@@ -76,6 +80,48 @@ void CORE_IOT_sendata(String mode, String feed, String data)
     else
     {
         // handle unknown mode
+    }
+}
+
+void coreiot_task(void *pvParameters) {
+    // Wait until WiFi STA is up before attempting MQTT connection.
+    xSemaphoreTake(xBinarySemaphoreInternet, portMAX_DELAY);
+    xSemaphoreGive(xBinarySemaphoreInternet);
+
+    while (1) {
+        CORE_IOT_reconnect();
+
+        if (tb.connected()) {
+            SensorData_t sensorData = {0.0f, 0.0f};
+            MLResult_t mlResult = {"Unknown", 0.0f};
+
+            xQueuePeek(xSensorQueue, &sensorData, 0);
+            xQueuePeek(xMLQueue, &mlResult, 0);
+
+            const char* vineyardState = getVineyardState(
+                sensorData.temperature, sensorData.humidity);
+
+            bool pump = false, fan = false;
+            if (xSemaphoreTake(xMutexActuatorState, pdMS_TO_TICKS(100)) == pdTRUE) {
+                pump = led1_state;
+                fan = led2_state;
+                xSemaphoreGive(xMutexActuatorState);
+            }
+
+            tb.sendTelemetryData("temperature", sensorData.temperature);
+            tb.sendTelemetryData("humidity", sensorData.humidity);
+            tb.sendTelemetryData("anomaly_score", mlResult.confidence);
+            tb.sendAttributeData("vineyard_state", vineyardState);
+            tb.sendAttributeData("pump_status", pump ? "ON" : "OFF");
+            tb.sendAttributeData("fan_status", fan  ? "ON" : "OFF");
+            tb.sendAttributeData("anomaly_label", mlResult.label);
+
+            Serial.printf("[CoreIOT-Cloud] T=%.1f H=%.1f state=%s anomaly=%s\n",
+                sensorData.temperature, sensorData.humidity,
+                vineyardState, mlResult.label);
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(COREIOT_INTERVAL_MS));
     }
 }
 
