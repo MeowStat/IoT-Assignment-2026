@@ -1,5 +1,6 @@
 #include "temp_humi_monitor.h"
 #include "config.h"
+#include "vineyard_state.h"
 
 DHT20 dht;
 LiquidCrystal_I2C lcd(33, 16, 2);
@@ -13,6 +14,9 @@ void temp_humi_monitor(void *pvParameters) {
   lcd.begin();
   lcd.backlight();
   lcd.clear();
+
+  pinMode(LED1_PIN, OUTPUT);
+  pinMode(LED2_PIN, OUTPUT);
 
   Serial.println("[SensorTask] LCD + DHT20 ready");
 
@@ -30,21 +34,29 @@ void temp_humi_monitor(void *pvParameters) {
     } else {
       SensorData_t data = { temperature, humidity };
       xQueueOverwrite(xSensorQueue, &data);
-
       xSemaphoreGive(xSemLED);
       xSemaphoreGive(xSemNeo);
 
+      // AUTO mode hysteresis (FR4.4) — symmetric on/off so devices can turn back off.
+      if (xSemaphoreTake(xMutexActuatorState, pdMS_TO_TICKS(100)) == pdTRUE) {
+          if (autoMode) {
+              if (humidity <  AUTO_PUMP_HUMID_ON  && !led1_state) {
+                  led1_state = true;  digitalWrite(LED1_PIN, HIGH);
+              } else if (humidity >= AUTO_PUMP_HUMID_OFF && led1_state) {
+                  led1_state = false; digitalWrite(LED1_PIN, LOW);
+              }
+              if (humidity >  AUTO_FAN_HUMID_ON   && !led2_state) {
+                  led2_state = true;  digitalWrite(LED2_PIN, HIGH);
+              } else if (humidity <= AUTO_FAN_HUMID_OFF  && led2_state) {
+                  led2_state = false; digitalWrite(LED2_PIN, LOW);
+              }
+          }
+          xSemaphoreGive(xMutexActuatorState);
+      }
+
       Serial.printf("[SensorTask] T: %.1f C  H: %.1f%%\n", temperature, humidity);
 
-      const char* state;
-      if (temperature > TEMP_CRITICAL_MIN || humidity >= HUMID_CRITICAL_MIN) {
-        state = "CRITICAL";
-      } else if ((temperature > TEMP_HOT_MIN && temperature <= TEMP_WARNING_MAX) ||
-                 (humidity > HUMID_IDEAL_MAX && humidity <= HUMID_WARNING_MAX)) {
-        state = "WARNING";
-      } else {
-        state = "NORMAL";
-      }
+      const char* state = getVineyardState(temperature, humidity);
 
       lcd.setCursor(0, 0);
       lcd.printf("T:%.1fC  H:%.1f%%", temperature, humidity);

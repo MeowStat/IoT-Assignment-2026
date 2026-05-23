@@ -36,15 +36,28 @@ function Send_Data(data) {
 }
 
 function onMessage(event) {
-    console.log("Received:", event.data);
-    try {
-        var data = JSON.parse(event.data);
-        if (data.page === "sensor") {
-            updateSensorUI(parseFloat(data.temp), parseFloat(data.humi));
-        }
-    } catch (e) {
-        console.warn("Not JSON:", event.data);
+    let d;
+    try { d = JSON.parse(event.data); }
+    catch (e) { console.warn("Not JSON:", event.data); return; }
+    if (d.page !== "sensor") return;
+
+    if (typeof d.temp !== 'undefined') updateSensorUI(parseFloat(d.temp), parseFloat(d.humi));
+
+    if (d.state) {
+        document.getElementById('val_state').textContent = d.state;
+        const badge = document.getElementById('badge_state');
+        badge.textContent = d.state;
+        badge.className = 'status-badge ' +
+            (d.state === 'NORMAL' ? 'badge-ok' : d.state === 'WARNING' ? 'badge-high' : 'badge-low');
     }
+    if (typeof d.anomaly !== 'undefined') {
+        document.getElementById('val_anomaly').textContent = d.anomaly;
+        document.getElementById('val_anomaly_score').textContent =
+            "Confidence: " + (typeof d.score === 'number' ? d.score.toFixed(2) : d.score);
+    }
+    if (typeof d.pump !== 'undefined') updateBtn('btnPump', d.pump);
+    if (typeof d.fan  !== 'undefined') updateBtn('btnFan',  d.fan);
+    if (typeof d.auto !== 'undefined') updateBtn('btnAuto', d.auto);
 }
 
 
@@ -73,8 +86,22 @@ function updateSensorState(valueId, badgeId, value, low, high) {
 }
 
 function updateSensorUI(temp, humi) {
-    updateSensorState('val_temp', 'badge_temp', temp, 15, 28);
-    updateSensorState('val_humi', 'badge_humi', humi, 60, 80);
+    updateSensorState('val_temp', 'badge_temp', temp, 20, 35);   // FR1 thresholds
+    updateSensorState('val_humi', 'badge_humi', humi, 40, 75);   // FR2 thresholds
+}
+
+// ==================== SPEC ACTUATOR + AUTO ====================
+function toggleActuator(which) {
+    Send_Data(JSON.stringify({ page: "actuator", value: { name: which, action: "toggle" } }));
+}
+function toggleAuto() {
+    Send_Data(JSON.stringify({ page: "auto", value: { action: "toggle" } }));
+}
+function updateBtn(id, on) {
+    const b = document.getElementById(id);
+    if (!b) return;
+    b.textContent = on ? "ON" : "OFF";
+    b.classList.toggle('on', !!on);
 }
 
 

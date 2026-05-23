@@ -1,5 +1,8 @@
 #include "task_webserver.h"
 #include "global.h"
+#include "ml_result.h"
+#include "config.h"
+#include "vineyard_state.h"
 
 AsyncWebServer webServer(80);
 AsyncWebSocket ws("/ws");
@@ -21,19 +24,32 @@ void Webserver_sendata(String data)
 
 void pushSensorData()
 {
-    if (xSemaphoreTake(xSemaphoreConfiguring, 0) != pdTRUE)
-        return;
-    xSemaphoreGive(xSemaphoreConfiguring);
+    if (!webserver_isrunning) return;
 
-    SensorData_t reading;
-    if (xQueuePeek(xSensorQueue, &reading, 0) == pdTRUE)
-    {
-        char buf[64];
-        snprintf(buf, sizeof(buf),
-                 "{\"page\":\"sensor\",\"temp\":%.1f,\"humi\":%.1f}",
-                 reading.temperature, reading.humidity);
-        Webserver_sendata(String(buf));
+    SensorData_t s = {0.0f, 0.0f};
+    MLResult_t   m = {"Unknown", 0.0f};
+    xQueuePeek(xSensorQueue, &s, 0);
+    xQueuePeek(xMLQueue,     &m, 0);
+
+    bool pump = false, fan = false, autoM = false;
+    if (xSemaphoreTake(xMutexActuatorState, pdMS_TO_TICKS(100)) == pdTRUE) {
+        pump  = led1_state;
+        fan   = led2_state;
+        autoM = autoMode;
+        xSemaphoreGive(xMutexActuatorState);
     }
+    const char* state = getVineyardState(s.temperature, s.humidity);
+
+    char buf[256];
+    snprintf(buf, sizeof(buf),
+        "{\"page\":\"sensor\",\"temp\":%.1f,\"humi\":%.1f,"
+        "\"state\":\"%s\",\"anomaly\":\"%s\",\"score\":%.2f,"
+        "\"pump\":%s,\"fan\":%s,\"auto\":%s}",
+        s.temperature, s.humidity, state, m.label, m.confidence,
+        pump  ? "true" : "false",
+        fan   ? "true" : "false",
+        autoM ? "true" : "false");
+    Webserver_sendata(String(buf));
 }
 
 void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len)

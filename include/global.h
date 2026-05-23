@@ -8,8 +8,8 @@
 #include "freertos/queue.h"
 #include "ml_result.h"
 
-#define LED1_PIN 48     // pump (irrigation valve)  - controlled by AUTO + telemetry
-#define LED2_PIN 41     // fan / shade motor       - controlled by AUTO + telemetry
+#define LED1_PIN 7     // pump - controlled by AUTO + telemetry
+#define LED2_PIN 8     // fan - controlled by AUTO + telemetry
 
 typedef struct {
     float temperature;

@@ -1,6 +1,7 @@
 #pragma once
 #include "config.h"
 
+/** Returns "CRITICAL", "WARNING", or "NORMAL" based on temperature and humidity thresholds from config.h. */
 static inline const char* getVineyardState(float temp, float humidity) {
     if (temp > TEMP_CRITICAL_MIN || humidity >= HUMID_CRITICAL_MIN) return "CRITICAL";
     if ((temp > TEMP_HOT_MIN && temp <= TEMP_WARNING_MAX) ||

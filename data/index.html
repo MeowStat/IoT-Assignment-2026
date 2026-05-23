@@ -73,7 +73,7 @@
               <span style="font-size: 1.5rem; color: #666">°C</span>
             </div>
             <div class="status-badge" id="badge_temp">--</div>
-            <div class="optimal-label">Optimal: 15 - 28 °C</div>
+            <div class="optimal-label">Optimal: 20 - 35 °C</div>
           </div>
 
           <div class="gauge-card">
@@ -86,7 +86,20 @@
               <span style="font-size: 1.5rem; color: #666">%</span>
             </div>
             <div class="status-badge" id="badge_humi">--</div>
-            <div class="optimal-label">Optimal: 60 - 80 %</div>
+            <div class="optimal-label">Optimal: 40 - 75 %</div>
+          </div>
+        </div>
+
+        <div class="gauges-container" style="margin-top: 20px">
+          <div class="gauge-card">
+            <div class="gauge-title">Vineyard State</div>
+            <div id="val_state" style="font-size: 2.4rem; font-weight: bold; margin: 20px 0">--</div>
+            <div class="status-badge" id="badge_state">--</div>
+          </div>
+          <div class="gauge-card">
+            <div class="gauge-title">ML Anomaly</div>
+            <div id="val_anomaly" style="font-size: 1.6rem; font-weight: bold; margin: 20px 0">--</div>
+            <div class="optimal-label" id="val_anomaly_score">Confidence: --</div>
           </div>
         </div>
       </div>
@@ -94,19 +107,37 @@
       <!-- ACTUATORS -->
       <div id="device" class="section" style="display: none">
         <header>
-          <h1>Control Actuators</h1>
-          <p>Manage and control connected devices.</p>
+          <h1>Vineyard Controls</h1>
+          <p>Spec-mandated pump &amp; fan (AUTO mode), plus user-added relays.</p>
         </header>
 
-        <div class="device-list" id="relayContainer"></div>
+        <!-- PUMP / FAN / AUTO -->
+        <div class="device-list">
+          <div class="device-card">
+            <h3>Pump (Irrigation Valve)</h3>
+            <p>GPIO 7 · LED1</p>
+            <button id="btnPump" class="toggle-btn" onclick="toggleActuator('pump')">OFF</button>
+          </div>
 
-        <button
-          class="add-relay-btn"
-          onclick="openAddRelayDialog()"
-          title="Add new"
-        >
-          +
-        </button>
+          <div class="device-card">
+            <h3>Fan / Shade Motor</h3>
+            <p>GPIO 8 · LED2</p>
+            <button id="btnFan" class="toggle-btn" onclick="toggleActuator('fan')">OFF</button>
+          </div>
+
+          <div class="device-card">
+            <h3>AUTO Mode</h3>
+            <p>Pump ON when RH&lt;40%, Fan ON when RH&gt;80% (with hysteresis).</p>
+            <button id="btnAuto" class="toggle-btn" onclick="toggleAuto()">OFF</button>
+          </div>
+        </div>
+
+        <hr style="margin: 24px 0; border-color: rgba(0,0,0,0.08)">
+        <h2 style="font-size: 1rem; margin-bottom: 10px; color: #888;">Additional Relays</h2>
+
+        <!-- Dynamic user-added relays -->
+        <div class="device-list" id="relayContainer"></div>
+        <button class="add-relay-btn" onclick="openAddRelayDialog()" title="Add new">+</button>
       </div>
 
       <!-- INFO -->
